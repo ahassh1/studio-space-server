@@ -32,11 +32,15 @@ app.post("/add-studio", async (req, res) => {
   const data = req.body;
 
   const result = await studioCollection.insertOne(data);
-
-  console.log(result);
+ console.log(result);
   res.send(result);
 });
 
+  //http://localhost:8000/studios
+app.get("/studios", async(req, res)=>{
+    const result = await studioCollection.find().toArray()
+     res.send(result)
+})
 // Home Route
 app.get("/", (req, res) => {
   res.send("Hello World!");
