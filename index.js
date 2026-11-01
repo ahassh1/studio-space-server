@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import { MongoClient } from "mongodb";
 import "dotenv/config";
-
+import { ObjectId } from "mongodb";
 const app = express();
 const port = 8000;
 
@@ -36,10 +36,15 @@ app.post("/add-studio", async (req, res) => {
   res.send(result);
 });
 
-  //http://localhost:8000/studios
+  //http://localhost:8000/studios/id
 app.get("/studios", async(req, res)=>{
     const result = await studioCollection.find().toArray()
      res.send(result)
+})
+app.get("/studios/:id", async(req, res)=>{
+    const {id}= req.params
+    const result = await studioCollection.findOne({_id: new ObjectId(id)})
+    res.send(result)
 })
 // Home Route
 app.get("/", (req, res) => {
