@@ -26,6 +26,7 @@ export async function connectToMongoDB() {
 const mongoClient = await connectToMongoDB();
 const db = mongoClient.db("studio-space");
 const studioCollection = db.collection("studio");
+const studioBookingCollection = db.collection("studioBooking")
 
 // Add New Studio
 app.post("/add-studio", async (req, res) => {
@@ -41,10 +42,26 @@ app.get("/studios", async(req, res)=>{
     const result = await studioCollection.find().toArray()
      res.send(result)
 })
-app.get("/studios/:id", async(req, res)=>{
-    const {id}= req.params
-    const result = await studioCollection.findOne({_id: new ObjectId(id)})
-    res.send(result)
+// Get single studio
+app.get("/studios/:id", async (req, res) => {
+
+    const { id } = req.params;
+    // Validate MongoDB ID
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        message: "Invalid studio ID",
+      });
+    }
+    // Find studio data
+    const result = await studioCollection.findOne({
+      _id: new ObjectId(id),
+    });
+    res.send(result);
+});
+app.post("/studios/my-bookings", async(req, res)=>{
+  const data = req.body;
+  const result = await studioBookingCollection.insertOne(data)
+  res.send(result) 
 })
 // Home Route
 app.get("/", (req, res) => {
