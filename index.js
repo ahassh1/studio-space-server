@@ -64,12 +64,17 @@ app.get("/studios", async(req, res)=>{
     res.send(result);
    });
 
-  // create bookings
-app.post("/dashboard/my-bookings", async(req, res)=>{
+// Create bookings
+app.post("/dashboard/my-bookings", async (req, res) => {
   const data = req.body;
-  const result = await studioBookingCollection.insertOne(data)
-  res.send(result) 
-})
+
+  const result = await studioBookingCollection.insertOne({
+    ...data,
+    status: "Pending",
+  });
+
+  res.send(result);
+});
 
 // Get Bookings
 app.get("/dashboard/my-bookings", async (req, res) => {
@@ -102,6 +107,17 @@ app.delete("/studios/:id", async(req, res)=>{
   const result = await studioCollection.deleteOne({_id: new ObjectId(id)})
   res.send(result)
 })
+// Cancel booking
+app.patch("/dashboard/my-bookings/:id/cancel", async (req, res) => {
+  const { id } = req.params;
+
+  const result = await studioBookingCollection.updateOne(
+    { _id: new ObjectId(id), status: "Pending" },
+    { $set: { status: "Cancelled" } }
+  );
+
+  res.send(result);
+});
 //http://localhost:8000/studios/id
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
