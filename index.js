@@ -78,6 +78,13 @@ app.get("/dashboard/my-bookings", async (req, res) => {
   res.send(result);
 });
 
+// Get My Listings
+app.get("/dashboard/my-listings", async (req, res) => {
+  const result = await studioCollection.find().toArray();
+  res.send(result);
+});
+
+
 //http://localhost:8000/studios/id
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
