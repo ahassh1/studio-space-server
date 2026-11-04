@@ -52,12 +52,11 @@ app.get("/studios", async(req, res)=>{
     app.get("/studios/:id", async (req, res) => {
     const { id } = req.params;
      
-    if (!ObjectId.isValid(id)) {
+    if (!ObjectId.isValid(id)) {  //validation id
       return res.status(400).json({
         message: "Invalid studio ID",
       });
     }
-    
     // Find studio data
     const result = await studioCollection.findOne({
       _id: new ObjectId(id),
@@ -84,7 +83,25 @@ app.get("/dashboard/my-listings", async (req, res) => {
   res.send(result);
 });
 
+// Update or edit studio
+app.put("/studios/:id", async (req, res) => {
+  const id = req.params.id; // Get studio ID from URL
+  const data = req.body; // Get updated data from request body
 
+  const result = await studioCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: data }
+  );
+
+  res.send(result); // Send update result
+});
+
+// delete studio
+app.delete("/studios/:id", async(req, res)=>{
+  const id= req.params.id;
+  const result = await studioCollection.deleteOne({_id: new ObjectId(id)})
+  res.send(result)
+})
 //http://localhost:8000/studios/id
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
