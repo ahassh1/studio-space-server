@@ -3,6 +3,7 @@ import cors from "cors";
 import { MongoClient } from "mongodb";
 import "dotenv/config";
 import { ObjectId } from "mongodb";
+import {createRemoteJWKSet, jwtVerify} from "jose" 
 const app = express();
 const port = 8000;
 
@@ -28,23 +29,46 @@ const db = mongoClient.db("studio-space");
 const studioCollection = db.collection("studio");
 const studioBookingCollection = db.collection("studioBooking")
 
-// verify user
-const verifyApi = (req, res) =>{
-  const authHeader = req.headers.authorization
-  console.log(authHeader)
-  if(authHeader !=="user logged in"){
-    return res.status(401).send({msg: "Unauthorized"})
+// Create JWKS instance
+const JWKS = createRemoteJWKSet(
+  new URL("http://127.0.0.1:3000/api/auth/jwks"),    //http://localhost:3000/api/auth/jwks (this url is not working)
+  {
+    timeoutDuration: 15000, // Set request timeout
   }
-    next()
-  }
+);
+
+// Verify user token
+const verifyToken = async (req, res, next) => {
+  // Get authorization header
+    const authHeader = req.headers.authorization; 
+
+    if (!authHeader) {
+      return res.status(401).send({ msg: "Unauthorized" });
+    }
+
+    const token = authHeader.split(" ")[1]; // Extract bearer token
+
+    if (!token) {
+      return res.status(401).send({ msg: "Unauthorized" });
+    }
+  
+    try{
+        const { payload } = await jwtVerify(token, JWKS); // Verify JWT signature
+    
+    next(); // Continue request processing
+    } catch(error){
+      return res.status(500).send({msg: "Enternal Server Error"})
+    }
+ 
+};
 
 // Home Route
 app.get("/", (req, res) => {
   res.send("StudioSpace Server is Running!");
 });
 
-// Add New Studio
-app.post("/dashboard/add-studio", async (req, res) => {
+// Add New Studio 
+app.post("/dashboard/add-studio", verifyToken, async (req, res) => {
   const data = req.body;
 
   const result = await studioCollection.insertOne(data);
@@ -59,7 +83,7 @@ app.get("/studios", async(req, res)=>{
     })
     
     // Get single studio
-    app.get("/studios/:id", async (req, res) => {
+    app.get("/studios/:id", verifyToken, async (req, res) => {
     const { id } = req.params;
      
     if (!ObjectId.isValid(id)) {  //validation id
@@ -75,7 +99,7 @@ app.get("/studios", async(req, res)=>{
    });
 
 // Create bookings
-app.post("/dashboard/my-bookings", async (req, res, next) => {
+app.post("/dashboard/my-bookings", verifyToken, async (req, res, next) => {
   const data = req.body;
 
   const result = await studioBookingCollection.insertOne({
@@ -87,7 +111,7 @@ app.post("/dashboard/my-bookings", async (req, res, next) => {
 });
 
 // Get Bookings
-app.get("/dashboard/my-bookings", verifyApi, async (req, res) => {
+app.get("/dashboard/my-bookings", verifyToken, async (req, res) => {
 
 
   const result = await studioBookingCollection.find().toArray();
@@ -95,13 +119,13 @@ app.get("/dashboard/my-bookings", verifyApi, async (req, res) => {
 });
 
 // Get My Listings
-app.get("/dashboard/my-listings", async (req, res) => {
+app.get("/dashboard/my-listings", verifyToken, async (req, res) => {
   const result = await studioCollection.find().toArray();
   res.send(result);
 });
 
 // Update or edit studio
-app.put("/studios/:id", async (req, res) => {
+app.put("/studios/:id", verifyToken, async (req, res) => {
   const id = req.params.id; // Get studio ID from URL
   const data = req.body; // Get updated data from request body
 
@@ -114,13 +138,13 @@ app.put("/studios/:id", async (req, res) => {
 });
 
 // delete studio
-app.delete("/studios/:id", async(req, res)=>{
+app.delete("/studios/:id", verifyToken, async(req, res)=>{
   const id= req.params.id;
   const result = await studioCollection.deleteOne({_id: new ObjectId(id)})
   res.send(result)
 })
 // Cancel booking
-app.patch("/dashboard/my-bookings/:id/cancel", async (req, res) => {
+app.patch("/dashboard/my-bookings/:id/cancel", verifyToken, async (req, res) => {
   const { id } = req.params;
 
   const result = await studioBookingCollection.updateOne(
@@ -130,7 +154,7 @@ app.patch("/dashboard/my-bookings/:id/cancel", async (req, res) => {
 
   res.send(result);
 });
-//http://localhost:8000/studios/id
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
