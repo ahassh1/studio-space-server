@@ -28,6 +28,16 @@ const db = mongoClient.db("studio-space");
 const studioCollection = db.collection("studio");
 const studioBookingCollection = db.collection("studioBooking")
 
+// verify user
+const verifyApi = (req, res) =>{
+  const authHeader = req.headers.authorization
+  console.log(authHeader)
+  if(authHeader !=="user logged in"){
+    return res.status(401).send({msg: "Unauthorized"})
+  }
+    next()
+  }
+
 // Home Route
 app.get("/", (req, res) => {
   res.send("StudioSpace Server is Running!");
@@ -65,7 +75,7 @@ app.get("/studios", async(req, res)=>{
    });
 
 // Create bookings
-app.post("/dashboard/my-bookings", async (req, res) => {
+app.post("/dashboard/my-bookings", async (req, res, next) => {
   const data = req.body;
 
   const result = await studioBookingCollection.insertOne({
@@ -77,7 +87,9 @@ app.post("/dashboard/my-bookings", async (req, res) => {
 });
 
 // Get Bookings
-app.get("/dashboard/my-bookings", async (req, res) => {
+app.get("/dashboard/my-bookings", verifyApi, async (req, res) => {
+
+
   const result = await studioBookingCollection.find().toArray();
   res.send(result);
 });
