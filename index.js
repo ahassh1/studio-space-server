@@ -1,9 +1,10 @@
+
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import "dotenv/config";
-import { ObjectId } from "mongodb";
-import {createRemoteJWKSet, jwtVerify} from "jose" 
+import { createRemoteJWKSet, jwtVerify } from "jose";
+
 const app = express();
 const port = 8000;
 
@@ -27,123 +28,123 @@ export async function connectToMongoDB() {
 const mongoClient = await connectToMongoDB();
 const db = mongoClient.db("studio-space");
 const studioCollection = db.collection("studio");
-const studioBookingCollection = db.collection("studioBooking")
+const studioBookingCollection = db.collection("studioBooking");
 
 // Create JWKS instance
 const JWKS = createRemoteJWKSet(
-  new URL("http://127.0.0.1:3000/api/auth/jwks"),    //http://localhost:3000/api/auth/jwks (this url is not working)
-  {
-    timeoutDuration: 15000, // Set request timeout
-  }
+  new URL(`${process.env.CLIENT_URL}/api/auth/jwks`)
 );
 
 // Verify user token
 const verifyToken = async (req, res, next) => {
-  // Get authorization header
-    const authHeader = req.headers.authorization; 
+  const authHeader = req.headers.authorization;
 
-    if (!authHeader) {
-      return res.status(401).send({ msg: "Unauthorized" });
-    }
+  if (!authHeader) {
+    return res.status(401).send({ msg: "Unauthorized" });
+  }
 
-    const token = authHeader.split(" ")[1]; // Extract bearer token
+  const token = authHeader.split(" ")[1];
 
-    if (!token) {
-      return res.status(401).send({ msg: "Unauthorized" });
-    }
-  
-    try{
-        const { payload } = await jwtVerify(token, JWKS); // Verify JWT signature
-    
-    next(); // Continue request processing
-    } catch(error){
-      return res.status(500).send({msg: "Enternal Server Error"})
-    }
- 
+  try {
+    const { payload } = await jwtVerify(token, JWKS);
+
+    req.user = payload;
+    next();
+  } catch (error) {
+    return res.status(401).send({ msg: "Invalid Token" });
+  }
 };
+
 
 // Home Route
 app.get("/", (req, res) => {
   res.send("StudioSpace Server is Running!");
 });
 
-// Add New Studio 
+// Add New Studio
 app.post("/dashboard/add-studio", verifyToken, async (req, res) => {
-  const data = req.body;
+const data = req.body;
+data.userEmail = req.user.email;
 
-  const result = await studioCollection.insertOne(data);
- console.log(result);
+const result = await studioCollection.insertOne(data);
   res.send(result);
 });
 
-    // get all studio
-app.get("/studios", async(req, res)=>{
-  const result = await studioCollection.find().toArray()
-     res.send(result)
-    })
-    
-    // Get single studio
-    app.get("/studios/:id", verifyToken, async (req, res) => {
-    const { id } = req.params;
-     
-    if (!ObjectId.isValid(id)) {  //validation id
-      return res.status(400).json({
-        message: "Invalid studio ID",
-      });
-    }
-    // Find studio data
-    const result = await studioCollection.findOne({
-      _id: new ObjectId(id),
+// Get All Studios
+app.get("/studios", async (req, res) => {
+  const result = await studioCollection.find().toArray();
+  res.send(result);
+});
+
+// Get Single Studio
+app.get("/studios/:id", verifyToken, async (req, res) => {
+  const { id } = req.params;
+
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({
+      message: "Invalid studio ID",
     });
-    res.send(result);
-   });
+  }
 
-// Create bookings
-app.post("/dashboard/my-bookings", verifyToken, async (req, res, next) => {
-  const data = req.body;
-
-  const result = await studioBookingCollection.insertOne({
-    ...data,
-    status: "Pending",
+  // Find studio data
+  const result = await studioCollection.findOne({
+    _id: new ObjectId(id),
   });
 
   res.send(result);
 });
 
+// Create Bookings
+app.post("/dashboard/my-bookings", verifyToken, async (req, res) => {
+  const data = req.body;
+  data.userEmail = req.user.email;
+  data.status = "Pending";
+
+  const result = await studioBookingCollection.insertOne(data);
+  res.send(result);
+});
+
 // Get Bookings
 app.get("/dashboard/my-bookings", verifyToken, async (req, res) => {
+  const email =req.user.email 
+  const result = await studioBookingCollection
+    .find({ userEmail: email})
+    .toArray();
 
-
-  const result = await studioBookingCollection.find().toArray();
   res.send(result);
 });
 
 // Get My Listings
 app.get("/dashboard/my-listings", verifyToken, async (req, res) => {
-  const result = await studioCollection.find().toArray();
+  const email = req.user.email;
+const result = await studioCollection.find({ userEmail: email }).toArray();
   res.send(result);
 });
-
-// Update or edit studio
+// Update or Edit Studio
 app.put("/studios/:id", verifyToken, async (req, res) => {
-  const id = req.params.id; // Get studio ID from URL
-  const data = req.body; // Get updated data from request body
+  const id = req.params.id;
+  const data = req.body;
 
   const result = await studioCollection.updateOne(
     { _id: new ObjectId(id) },
     { $set: data }
   );
 
-  res.send(result); // Send update result
+  res.send(result);
 });
 
-// delete studio
-app.delete("/studios/:id", verifyToken, async(req, res)=>{
-  const id= req.params.id;
-  const result = await studioCollection.deleteOne({_id: new ObjectId(id)})
-  res.send(result)
-})
-// Cancel booking
+// Delete Studio
+app.delete("/studios/:id", verifyToken, async (req, res) => {
+  const id = req.params.id;
+
+  const result = await studioCollection.deleteOne({
+    _id: new ObjectId(id),
+  });
+
+  res.send(result);
+});
+
+// Cancel Booking
 app.patch("/dashboard/my-bookings/:id/cancel", verifyToken, async (req, res) => {
   const { id } = req.params;
 
@@ -155,6 +156,11 @@ app.patch("/dashboard/my-bookings/:id/cancel", verifyToken, async (req, res) => 
   res.send(result);
 });
 
-app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`);
-});
+// Start Server Locally
+if (process.env.NODE_ENV !== "production") {
+  app.listen(port, () => {
+    console.log(`Example app listening on port ${port}`);
+  });
+}
+
+export default app;
